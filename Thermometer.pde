@@ -1,6 +1,8 @@
 #include <LiquidCrystal.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <avr/sleep.h>
+#include <avr/wdt.h>
 
 // pin for communicating with temperature sensor
 #define ONE_WIRE_BUS 9
@@ -11,6 +13,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 // LCD object
 LiquidCrystal lcd(8, 7, 6, 5, 4, 3);
+volatile boolean f_wdt = 1;
 
 // definition of degree glyph.  ones are selected pixels
 byte degreeGlyph[8] = {
@@ -35,7 +38,38 @@ void setup(void) {
     lcd.begin(16,2);
     // initialize temp sensor
     sensors.begin();
+    
+      // SMCR - Sleep Mode Control Register
+  SMCR = (1 << SM1) | (1 << SE);
+  MCUSR &= ~(1 << WDRF);
+
+  // start timed sequence
+  // you must make the other bit changes within 4 clock cycles
+  WDTCSR |= (1 << WDCE) | (1 << WDE);
+
+  // set new watchdog timeout value
+  WDTCSR = (1 << WDIE) | (1 << WDCE) | (1 << WDP2) | (1 << WDP1) | (1 << WDP0);
+
 }
+
+ISR(WDT_vect) {
+  f_wdt = 1;
+}
+
+
+void system_sleep() {
+  // ADCSRA - ADC control and status register A
+  ADCSRA &= ~(1 << ADEN);
+
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
+  sleep_enable();
+
+  sleep_mode();                        // System sleeps here
+
+  sleep_disable();                     // System continues execution here when watchdog timed out 
+  ADCSRA |= (1 << ADEN);
+}
+
 
 void printTemperature() {
     sensors.requestTemperatures();
@@ -82,6 +116,10 @@ void lcdPrintPadded(int val) {
 }
 
 void loop(void) {
+    if (f_wdt == 1) {
+      f_wdt=0;
+    }
     printTemperature();
-    delay(1000);
+    system_sleep();
+    //delay(1000);
 }
