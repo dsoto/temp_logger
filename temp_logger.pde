@@ -234,15 +234,6 @@ void loop(void) {
 
   }
   delay(1000);
-  /*
-    //String time = readTimeToString();
-    //Serial.print(time);
-    printTemperature();
-    lcd.setCursor(2,1);
-      char * datetime = constructDateString(year, month, day, hour, minute, second);
-    lcd.print(datetime);
-    Serial.write(datetime);
-    delay(500);
 
   // look for string of length 12 YYMMDDHHMMSS on serial and then use to set time
   char dateString[13];
@@ -256,5 +247,11 @@ void loop(void) {
     Serial.println();
     setTime(dateString);
   }
-  */
+  else {
+  // if serial port has less than 12, clear it out
+  while (Serial.available() > 0){
+    Serial.read();
+    }
+}
+
 }
