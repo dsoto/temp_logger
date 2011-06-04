@@ -33,6 +33,7 @@ byte degreeGlyph[8] = {
 void setup(void) {
     // serial stuff
     Serial.begin(9600);
+    Serial.println("templogger begin");
     // create degree glyph for LCD
     lcd.createChar(0, degreeGlyph);
     // initialize LCD with dimensions
