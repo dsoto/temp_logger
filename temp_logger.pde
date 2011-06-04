@@ -8,11 +8,10 @@
 
 // pin for communicating with temperature sensor
 #define ONE_WIRE_BUS 9
-// size of boxcar average window
-#define nBoxcar 10
 // temperature sensor objects
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
+
 // LCD object
 LiquidCrystal lcd(8, 7, 6, 5, 4, 3);
 volatile boolean f_wdt = 1;
@@ -31,7 +30,6 @@ byte degreeGlyph[8] = {
     B00000,
     B00000
 };
-float boxcarCelsius[nBoxcar];
 int i = 0;
 
 void setup(void) {
@@ -204,15 +202,6 @@ void system_sleep() {
 void printTemperature() {
     sensors.requestTemperatures();
     float tempC = sensors.getTempCByIndex(0);
-    // increment index on boxcar
-    i++;
-    if (i == nBoxcar) i = 0;
-    boxcarCelsius[i] = tempC;
-    // average over boxcar array
-    tempC = 0;
-    for (int j = 0; j < nBoxcar; j++) {
-        tempC += boxcarCelsius[j] / nBoxcar;
-    }
     // print to lcd
     lcd.setCursor(1, 0);
     lcdPrintTemp(tempC);
