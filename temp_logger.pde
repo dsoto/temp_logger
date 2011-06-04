@@ -16,6 +16,8 @@ const int CS = 10; // chip select pin
 unsigned int val;
 unsigned int digit;
 
+const int sampleIntervalMinutes = 1;
+
 // definition of degree glyph.  ones are selected pixels
 byte degreeGlyph[8] = {
     B01100,
@@ -48,6 +50,7 @@ void setup(void) {
 
 }
 
+// this function encapsulates a write to the real time clock
 void writeToSPI(int instruction, int value){
   digitalWrite(CS, LOW);
   SPI.transfer(instruction);
@@ -55,118 +58,93 @@ void writeToSPI(int instruction, int value){
   digitalWrite(CS, HIGH);
 }
 
-void setTime(String response){
-  // year
-  val = 0;
+// converts a binary coded decimal to a decimal
+int convertBCDtoDEC(int valBCD){
+  int valDEC;
+  valDEC = ((valBCD & 0xF0) >> 4) * 10;
+  valDEC += valBCD & 0x0F;
+  return(valDEC);
+}
+
+// reads the BCD at address on the RTC and returns a converted int value
+// representing that piece of the date
+int readTimeValue(int address){
+  digitalWrite(CS, LOW);
+  SPI.transfer(address);
+  int valBCD = SPI.transfer(0x00);
+  digitalWrite(CS, HIGH);
+  int valDEC = convertBCDtoDEC(valBCD);
+  return(valDEC);
+}
+
+// reads the entire yymmddhhmmss values from the RTC
+void readTime(int * year,
+              int * month,
+              int * day,
+              int * hour,
+              int * minute,
+              int * second){
+  *year    = readTimeValue(0x06);
+  *month   = readTimeValue(0x05);
+  *day     = readTimeValue(0x04);
+  *hour    = readTimeValue(0x02);
+  *minute  = readTimeValue(0x01);
+  *second  = readTimeValue(0x00);
+}
+
+// value is written to datetime string in two digits and the string address index is incremented
+void placeDigitsInArray(char * datetime, int * index, int value){
+  datetime[(*index)++] = (value / 10) + 0x30;
+  datetime[(*index)++] = (value % 10) + 0x30;
+}
+
+// using the values passed in, an 18 digit zero terminated string is constructed and passed back
+char * constructDateString(int year,
+                           int month,
+                           int day,
+                           int hour,
+                           int minute,
+                           int second){
+  char datetime[18] = {0};
   int i = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x86, val);
-
-  // month
-  val = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x85, val);
-
-  // day
-  val = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x84, val);
-
-  // hour
-  val = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x82, val);
-
-  // minute
-  val = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x81, val);
-
-  // seconds
-  val = 0;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit << 4;
-  digit = response.charAt(i++) - 0x30;
-  val |= digit;
-  writeToSPI(0x80, val);
+  placeDigitsInArray(datetime, &i, year);
+  datetime[i++] = '/';
+  placeDigitsInArray(datetime, &i, month);
+  datetime[i++] = '/';
+  placeDigitsInArray(datetime, &i, day);
+  datetime[i++] = ' ';
+  placeDigitsInArray(datetime, &i, hour);
+  datetime[i++] = ':';
+  placeDigitsInArray(datetime, &i, minute);
+  datetime[i++] = ':';
+  placeDigitsInArray(datetime, &i, second);
+  datetime[i++] = 0;
+  return(datetime);
 }
 
-String readTimeToString(){
-  String time = "";
-
-  // year
-  /*
-  digitalWrite(10, LOW);
-  SPI.transfer(0x06);
-  val = SPI.transfer(0x00);
-  digitalWrite(10, HIGH);
-  digit = (val & 0xF0) >> 4;
-  time.concat(digit);
-  digit = (val & 0x0F);
-  time.concat(digit);
-  time.concat('/');
-  */
-
-  // month
-  digitalWrite(10, LOW);
-  SPI.transfer(0x05);
-  val = SPI.transfer(0x00);
-  digitalWrite(10, HIGH);
-  digit = (val & 0xF0) >> 4;
-  time.concat(digit);
-  digit = (val & 0x0F);
-  time.concat(digit);
-  time.concat('/');
-
-  // day
-  digitalWrite(10, LOW);
-  SPI.transfer(0x04);
-  val = SPI.transfer(0x00);
-  digitalWrite(10, HIGH);
-  digit = (val & 0xF0) >> 4;
-  time.concat(digit);
-  digit = (val & 0x0F);
-  time.concat(digit);
-  time.concat("  ");
-
-  // hour
-  digitalWrite(10, LOW);
-  SPI.transfer(0x02);
-  val = SPI.transfer(0x00);
-  digitalWrite(10, HIGH);
-  digit = (val & 0x30) >> 4;
-  time.concat(digit);
-  digit = (val & 0x0F);
-  time.concat(digit);
-  time.concat(":");
-
-  // minute
-  digitalWrite(10, LOW);
-  SPI.transfer(0x01);
-  val = SPI.transfer(0x00);
-  digitalWrite(10, HIGH);
-  digit = (val & 0xF0) >> 4;
-  time.concat(digit);
-  digit = (val & 0x0F);
-  time.concat(digit);
-
-  return(time);
+void writeRTC(char * dateString, int * index, int address){
+  int val = 0;
+  val |= (dateString[(*index)++] - 0x30) << 4;
+  val |= (dateString[(*index)++] - 0x30);
+  writeToSPI(address, val);
 }
+
+void setTime(char * dateString){
+  int i = 0;
+  writeRTC(dateString, &i, 0x86);
+  writeRTC(dateString, &i, 0x85);
+  writeRTC(dateString, &i, 0x84);
+  writeRTC(dateString, &i, 0x82);
+  writeRTC(dateString, &i, 0x81);
+  writeRTC(dateString, &i, 0x80);
+}
+
+float readTemperature(){
+    sensors.requestTemperatures();
+    float tempC = sensors.getTempCByIndex(0);
+    return tempC;
+}
+
 
 void printTemperature() {
     sensors.requestTemperatures();
@@ -207,10 +185,67 @@ void lcdPrintPadded(int val) {
 }
 
 void loop(void) {
-    String time = readTimeToString();
-    Serial.print(time);
+
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    int second;
+    //char datetime[20] = {0};
+
+    // read time from RTC and store in variables
+    readTime(&year, &month, &day, &hour, &minute, &second);
+    lcd.setCursor(0,0);
+    lcd.print(second);
+
+    // test if time is a multiple of sampleIntervalMinutes.
+    // if yes, write to serial.
+    if ((minute % sampleIntervalMinutes == 0) and (second == 0)){
+        // get date and write to serial
+        // fixme: i need to allocate datestring (ticket 2)
+        char * datetime = constructDateString(year, month, day, hour, minute, second);
+        Serial.write(datetime);
+
+        // read temp and write to serial
+        float tempC = readTemperature();
+        Serial.print(",");
+        Serial.print(tempC);
+        Serial.println();
+
+        // write date and temp to lcd
+        lcd.setCursor(1,1);
+        lcd.print(tempC,1);
+        lcd.write(0);
+        lcd.print("C  ");
+        float tempF = (tempC * 9/5) + 32;
+        lcd.print(tempF,1);
+        lcd.write(0);
+        lcd.print("F");
+
+  }
+  delay(1000);
+  /*
+    //String time = readTimeToString();
+    //Serial.print(time);
     printTemperature();
     lcd.setCursor(2,1);
-    lcd.print(time);
-    delay(1000);
+      char * datetime = constructDateString(year, month, day, hour, minute, second);
+    lcd.print(datetime);
+    Serial.write(datetime);
+    delay(500);
+
+  // look for string of length 12 YYMMDDHHMMSS on serial and then use to set time
+  char dateString[13];
+  if (Serial.available() >= 12){
+    for (int i=0; i<12; i++){
+      dateString[i] = Serial.read();
+    }
+    dateString[12] = 0;
+    Serial.print("received string ");
+    Serial.write(dateString);
+    Serial.println();
+    setTime(dateString);
+  }
+  */
 }
