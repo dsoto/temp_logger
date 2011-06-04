@@ -196,8 +196,8 @@ void loop(void) {
 
     // read time from RTC and store in variables
     readTime(&year, &month, &day, &hour, &minute, &second);
-    lcd.setCursor(0,0);
-    lcd.print(second);
+    //lcd.setCursor(0,0);
+    //lcd.print(second);
 
     // test if time is a multiple of sampleIntervalMinutes.
     // if yes, write to serial.
@@ -214,6 +214,15 @@ void loop(void) {
         Serial.println();
 
         // write date and temp to lcd
+        lcd.setCursor(2,0);
+        lcdPrintPadded(month);
+        lcd.print("/");
+        lcdPrintPadded(day);
+        lcd.setCursor(9,0);
+        lcdPrintPadded(hour);
+        lcd.print(":");
+        lcdPrintPadded(minute);
+
         lcd.setCursor(1,1);
         lcd.print(tempC,1);
         lcd.write(0);
