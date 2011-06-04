@@ -233,7 +233,30 @@ void loop(void) {
         lcd.write(0);
         lcd.print("F");
 
-  }
+  } else if (second == 0) {
+    // write to lcd
+        // read temp and write to serial
+        float tempC = readTemperature();
+
+        // write date and temp to lcd
+        lcd.setCursor(2,0);
+        lcdPrintPadded(month);
+        lcd.print("/");
+        lcdPrintPadded(day);
+        lcd.setCursor(9,0);
+        lcdPrintPadded(hour);
+        lcd.print(":");
+        lcdPrintPadded(minute);
+
+        lcd.setCursor(1,1);
+        lcd.print(tempC,1);
+        lcd.write(0);
+        lcd.print("C  ");
+        float tempF = (tempC * 9/5) + 32;
+        lcd.print(tempF,1);
+        lcd.write(0);
+        lcd.print("F");
+}
   delay(1000);
 
   // look for string of length 12 YYMMDDHHMMSS on serial and then use to set time
