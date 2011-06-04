@@ -16,7 +16,7 @@ const int CS = 10; // chip select pin
 unsigned int val;
 unsigned int digit;
 
-const int sampleIntervalMinutes = 1;
+const int sampleIntervalMinutes = 15;
 
 // definition of degree glyph.  ones are selected pixels
 byte degreeGlyph[8] = {
